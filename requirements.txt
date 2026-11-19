@@ -1,0 +1,6 @@
+# CPU build of torch is recommended on a laptop:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.0
+numpy
+scikit-learn
+matplotlib
