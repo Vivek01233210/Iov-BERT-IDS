@@ -26,17 +26,6 @@ Most of the parameters sit in the 65,536-word byte-word embedding, which is chea
 
 The MBWM head only computes vocabulary logits at the masked positions. Without that trick, a 65k-way softmax over every token would not fit comfortably in 8 GB of RAM.
 
-### Extras the paper does not have
-These address weaknesses in the original evaluation:
-
-- `--no-pretrain`: an ablation that trains the same model from random initialisation, so you can show whether pre-training helps.
-- `--group-split`: a leak-free split. Whole sessions or CAN time-blocks go to either train or test, never both.
-- `--test-usl`: train on one vehicle and test on another, as in the paper's Experiment 3.
-- `semantic_extractor.py traffic --mode packet`: includes anonymised headers, so attacks with empty payloads (scans, SYN floods) become visible to the model.
-- `semantic_extractor.py can --window k`: puts k consecutive CAN frames in one sentence, which gives the model temporal context. The paper uses k = 1.
-- The scripts report inference time per sample.
-
----
 
 ## 1. Install (about 5 minutes)
 
@@ -105,7 +94,7 @@ Training stops on a clock (`--max-minutes` inside `pretrain.py` and `finetune.py
 
 Figs. 1 and 2 (IoV architecture and framework) are conceptual diagrams rather than results, so cite them from the paper or draw them yourself.
 
-## 3. Get real data
+## 3. Get data
 
 You don't need everything. **Start with Car-Hacking**: it is small and easy to process.
 
@@ -117,35 +106,6 @@ You don't need everything. **Start with Car-Hacking**: it is small and easy to p
 | In-vehicle + cross-vehicle (Exp 3) | **In-vehicle Network Intrusion Detection Challenge 2019** (preliminary round): Sonata / Soul / Spark | hksecurity.net → HCRL Datasets → datachallenge2019 | Has an R/T `Class` column; use `--format generic` |
 | Extra-vehicle fine-tuning | CICIDS2017 PCAPs + **GeneratedLabelledFlows** CSVs | unb.ca/cic/datasets/ids-2017.html | The *labelled-flows* CSVs contain Source/Destination IP and Port, which the 5-tuple matching needs. The *MachineLearningCVE* CSVs don't. Start with Wednesday (DoS attacks). |
 | | BoT-IoT (optional) | research.unsw.edu.au/projects/bot-iot-dataset | If you arrange pcaps as `folder/<ClassName>/*.pcap`, use the folder layout |
-
-### 3b. No internet or disk space? Generate synthetic look-alike data (about 1 GB, under a minute)
-
-```bash
-python generate_datasets.py --out datasets --size-gb 0.05
-```
-
-| Folder | Imitates | Contents |
-|---|---|---|
-| `datasets/car_hacking/` | HCRL Car-Hacking | `DoS_dataset.csv`, `Fuzzy_dataset.csv`, `gear_dataset.csv`, `RPM_dataset.csv`, `normal_run_data.txt` (same formats, real CAN IDs, same injection rates) |
-| `datasets/ivn/` | IVN Challenge 2019 | `Sonata/`, `Soul/`, `Spark/`, each with `Normal_`, `Flooding_`, `Fuzzy_`, `Malfunction_<car>.csv`. Sonata and Soul share part of their CAN IDs, as Hyundai and Kia do. |
-| `datasets/cicids/` | CICIDS2017 | `Monday-WorkingHours.pcap` (benign, for pre-training), `AttackDay-WorkingHours.pcap`, and its labelled-flows CSV (12 classes, as in the paper) |
-| `datasets/botiot/` | BoT-IoT | `Normal/`, `DoS/`, `DDoS/`, `Reconnaissance/`, `Theft/` pcaps (MQTT/CoAP IoT traffic; hping3, nmap and exfiltration attacks) |
-
-What the simulator does:
-- **CAN:** simulates a car driving (RPM, speed, gear, steering, braking) and the ECUs that broadcast it, each with its own ID, period, DLC, rolling counter and checksum. It injects attacks the way HCRL describes them.
-- **Network:** writes valid Ethernet/IPv4/TCP/UDP pcaps with handshakes and real protocol formats (TLS 1.3 ClientHello with SNI, HTTP, DNS, SSH, FTP, SMTP, MQTT). The attacks are modelled on the tools CICIDS and BoT-IoT used: Hulk, slowloris, slowhttptest, GoldenEye, LOIC, nmap, Patator, Ares bot, DVWA XSS and brute force, hping3.
-
-Then run the same extraction steps on it:
-```bash
-python semantic_extractor.py pretrain datasets/cicids/Monday-WorkingHours.pcap --out data/bsl.tsv
-python semantic_extractor.py can "datasets/car_hacking/*" --out data/carhack_usl.tsv
-python semantic_extractor.py can "datasets/ivn/Sonata/*" --format generic --out data/sonata_usl.tsv
-python semantic_extractor.py can "datasets/ivn/Soul/*"   --format generic --out data/soul_usl.tsv
-python semantic_extractor.py traffic datasets/cicids/AttackDay-WorkingHours.pcap \
-       --flows-csv datasets/cicids/AttackDay-WorkingHours.pcap_ISCX.csv --out data/cicids_usl.tsv
-python semantic_extractor.py traffic datasets/botiot --out data/botiot_usl.tsv
-```
-Add `--mode packet` to the `traffic` commands so that SYN scans and floods with empty payloads are included.
 
 > **Important:** this is simulated data. It is fine for building, debugging and running your experiments, but results on it are **not** results on the real datasets. Write "synthetic data" next to every number you report from it, and replace them with real-data results if you can later download at least the CAN datasets.
 
