@@ -2,7 +2,7 @@
 Mini IoV-BERT in plain PyTorch (no HuggingFace needed).
 
 Presets (paper = BERT-base: 12 layers, 768 hidden, 12 heads, ~110M params):
-  tiny  : 2 layers, 128 hidden, 2 heads  ->  ~8.8M params (mostly the 65k-word embedding)
+  tiny  : 2 layers, 128 hidden, 2 heads  ->  ~8.8M params
   small : 4 layers, 256 hidden, 4 heads  -> ~20M params
   base  : 12 layers, 768 hidden, 12 heads -> the paper's size (needs a GPU)
 """

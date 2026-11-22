@@ -5,7 +5,7 @@ IoV-BERT-IDS: the complete experimental pipeline of the paper in one command.
   python run_pipeline.py --data datasets                 # or the output of generate_datasets.py
   python run_pipeline.py --data datasets --minutes 30    # larger time budget -> better models
 
-Expected dataset layout (missing datasets are skipped, their experiments too):
+Expected dataset layout:
   <data>/cicids/       *.pcap  + labelled-flow *.csv (CICIDS2017 GeneratedLabelledFlows)
   <data>/botiot/       <ClassName>/*.pcap            (one folder per class)
   <data>/car_hacking/  DoS_dataset.csv Fuzzy_dataset.csv gear_dataset.csv RPM_dataset.csv normal_run_data.txt

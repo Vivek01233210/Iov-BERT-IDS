@@ -1,4 +1,4 @@
-# IoV-BERT-IDS Mini: a laptop version of IoV-BERT-IDS
+# IoV-BERT-IDS
 
 This is a scaled-down implementation of *IoV-BERT-IDS: Hybrid Network Intrusion Detection System in IoV Using Large Language Models* (Fu et al., IEEE TVT 2025).
 
@@ -22,14 +22,14 @@ raw traffic ──► Semantic Extractor ──► Byte Sentences ──► mini
 | Hardware | RTX 4080 16 GB | laptop CPU (a GPU is used automatically if one is present) |
 | Vocabulary, SE, MBWM/NBSP, 80/10/10 masking, [CLS] classifier | ✔ | ✔ identical |
 
-Most of the parameters sit in the 65,536-word byte-word embedding, which is cheap to compute. The transformer itself is small.
+Most of the parameters sit in the 65,536-word byte-word embedding, which is cheap to compute.
 
 The MBWM head only computes vocabulary logits at the masked positions. Without that trick, a 65k-way softmax over every token would not fit comfortably in 8 GB of RAM.
 
 
 ## 1. Install (about 5 minutes)
 
-You need Python 3.9–3.12.
+We need Python 3.9–3.12.
 
 ```bash
 python -m venv venv
@@ -40,7 +40,7 @@ pip install numpy scikit-learn matplotlib
 
 No pcap libraries are needed. `pcap_reader.py` reads `.pcap` and `.pcapng` files itself.
 
-## 2. Run the whole pipeline (about 10 minutes)
+## 2. Run the whole pipeline
 
 ```bash
 python run_pipeline.py --data datasets          # real datasets, laid out as below
@@ -87,16 +87,7 @@ Training stops on a clock (`--max-minutes` inside `pretrain.py` and `finetune.py
 | `report.md` | Every table and figure in one document |
 | `pipeline.log` | The full log of the run |
 
-**Notes on the comparison:**
-- The paper's baselines used flow-level features. Here AE, VAE and ByteSGAN are re-implemented and trained on the first 64 raw bytes of each packet or CAN frame, on the same split as IoV-BERT-IDS. `report.md` says this too.
-- If the data folder contains `README_SYNTHETIC.txt` (written by `generate_datasets.py`), every figure, table and the report are labelled "synthetic data".
-- Re-run with `--reuse` to skip stages whose outputs already exist (for example, to redraw the figures only).
-
-Figs. 1 and 2 (IoV architecture and framework) are conceptual diagrams rather than results, so cite them from the paper or draw them yourself.
-
 ## 3. Get data
-
-You don't need everything. **Start with Car-Hacking**: it is small and easy to process.
 
 | Purpose | Dataset | Where | Notes |
 |---|---|---|---|
@@ -104,10 +95,24 @@ You don't need everything. **Start with Car-Hacking**: it is small and easy to p
 | | *or* CICIDS2017 `Monday-WorkingHours.pcap` | unb.ca/cic/datasets/ids-2017.html | Benign-only day, about 10 GB. No need to cut it: the extractor streams the file and stops at `--max-pairs`. |
 | In-vehicle fine-tuning | **Car-Hacking** (HCRL) | hksecurity.net → HCRL Datasets → Car-Hacking | `DoS_dataset.csv`, `Fuzzy_dataset.csv`, `gear_dataset.csv`, `RPM_dataset.csv`, `normal_run_data.txt` |
 | In-vehicle + cross-vehicle (Exp 3) | **In-vehicle Network Intrusion Detection Challenge 2019** (preliminary round): Sonata / Soul / Spark | hksecurity.net → HCRL Datasets → datachallenge2019 | Has an R/T `Class` column; use `--format generic` |
-| Extra-vehicle fine-tuning | CICIDS2017 PCAPs + **GeneratedLabelledFlows** CSVs | unb.ca/cic/datasets/ids-2017.html | The *labelled-flows* CSVs contain Source/Destination IP and Port, which the 5-tuple matching needs. The *MachineLearningCVE* CSVs don't. Start with Wednesday (DoS attacks). |
+| Extra-vehicle fine-tuning | CICIDS2017 PCAPs | unb.ca/cic/datasets/ids-2017.html | The *labelled-flows* CSVs contain Source/Destination IP and Port, which the 5-tuple matching needs. The *MachineLearningCVE* CSVs don't. Start with Wednesday (DoS attacks). |
 | | BoT-IoT (optional) | research.unsw.edu.au/projects/bot-iot-dataset | If you arrange pcaps as `folder/<ClassName>/*.pcap`, use the folder layout |
 
-> **Important:** this is simulated data. It is fine for building, debugging and running your experiments, but results on it are **not** results on the real datasets. Write "synthetic data" next to every number you report from it, and replace them with real-data results if you can later download at least the CAN datasets.
+### The `datasets/` folder
+
+The repository's [`datasets/`](datasets/) folder is already in the layout that `run_pipeline.py --data datasets` expects:
+
+| Folder | Format of | Data type | Files | Classes |
+|---|---|---|---|---|
+| `car_hacking/` | Car-Hacking (HCRL) | CAN frames, one vehicle | 4 attack CSVs + `normal_run_data.txt` | Normal, DoS, Fuzzy, Gear spoofing, RPM spoofing |
+| `ivn/` | Survival Analysis / IVN (HCRL) | CAN frames, three vehicles | `Sonata/`, `Soul/`, `Spark/`: 4 CSVs each | Normal, Flooding, Fuzzy, Malfunction |
+| `botiot/` | BoT-IoT (UNSW) | IoT packets (PCAP) | one folder per class | Normal, DoS, DDoS, Reconnaissance, Theft |
+| `cicids/` | CICIDS2017 (CIC, UNB) | Enterprise packets (PCAP) + labelled-flow CSV | `Monday-WorkingHours.pcap` (benign, pre-training), `AttackDay-WorkingHours.pcap` + `_ISCX.csv` | BENIGN + 11 attacks (PortScan, DoS ×4, DDoS, Bot, Web ×2, FTP/SSH-Patator) |
+
+In the CAN files, the last column is `R` (normal) or `T` (attack). For BoT-IoT, the folder name is the label. CICIDS packets are labelled by matching their 5-tuple to a row of the flow CSV.
+
+[`datasets/README.md`](datasets/README.md) has the column formats, example rows, per-file class counts, original download links and citations.
+
 
 ## 4. Semantic Extractor: raw data → byte sentences
 
@@ -146,12 +151,10 @@ python pretrain.py --bsl data/bsl.tsv --preset small --steps 20000 --batch-size 
 ```
 
 - The script prints seconds per step and an **ETA** within the first minute. If the ETA is too long, lower `--steps` or switch to `--preset tiny`.
-- As a rough expectation on a 6-core Ryzen 5 CPU, `tiny` runs at a fraction of a second per step and `small` at about half a second to a second per step. That means `small` for 20k steps is an overnight job. Measure on your own machine.
 - A checkpoint is saved every 1,000 steps. If you close the laptop, re-run the same command with `--resume` to continue.
 - **What healthy training looks like:** MBWM accuracy rises steadily from about 0, and NBSP accuracy moves from 0.5 towards 0.9 or more.
 - The output `runs/pretrain/bert.pt` holds the encoder weights you will fine-tune.
 
-**Optional: use a free cloud GPU for this step only.** Kaggle Notebooks and Google Colab both offer a free GPU quota. Upload this folder and `bsl.tsv`, then run the same command; it uses CUDA automatically. There you can afford `--preset small --steps 50000` or even `--preset base`. Download `bert.pt` and do everything else on your laptop.
 
 ## 6. Fine-tune and evaluate
 
@@ -177,20 +180,7 @@ Each run writes the following to its `--out` folder:
 - `confusion_matrix.png`
 - `best.pt`: the best checkpoint by validation macro-F1
 
-Useful flags:
-- `--batch-size 32` if RAM is tight
-- `--freeze-layers 2` for faster fine-tuning
-- `--class-weights` for imbalanced classes
-- `--max-len 64`: CAN sentences are short, so this speeds things up
-
-## 7. Tips for a basic laptop
-
-- Close the browser and other heavy apps while training, and keep the laptop plugged in with sleep disabled.
-- If you run out of memory, lower `--batch-size`, use `--preset tiny`, or pass `--limit 100000` to `pretrain.py`. Car-Hacking also works fine with `--max-per-class 5000`.
-- `--threads` defaults to all CPU cores. Set it to (cores − 1) if you want the laptop to stay usable.
-- Fine-tuning is much cheaper than pre-training. A 50k-row CAN dataset usually takes minutes per epoch on `small`.
-
-## 8. Writing it up
+## 7. Writing it up
 
 State clearly that this is a scaled-down reproduction: model size, pre-training corpus size and hardware differ, as in the table above. Report the ablation (with vs. without pre-training) and the group split alongside the standard split. Those two results say more about whether the idea works than near-100% accuracy on Car-Hacking, which simple models also reach.
 
