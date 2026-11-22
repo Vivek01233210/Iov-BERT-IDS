@@ -1,8 +1,7 @@
 """
 IoV-BERT-IDS: the complete experimental pipeline of the paper in one command.
 
-  python run_pipeline.py --data datasets                 # real downloaded datasets
-  python run_pipeline.py --data datasets                 # or the output of generate_datasets.py
+  python run_pipeline.py --data datasets                 
   python run_pipeline.py --data datasets --minutes 30    # larger time budget -> better models
 
 Expected dataset layout:

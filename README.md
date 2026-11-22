@@ -24,8 +24,6 @@ raw traffic ──► Semantic Extractor ──► Byte Sentences ──► mini
 
 Most of the parameters sit in the 65,536-word byte-word embedding, which is cheap to compute.
 
-The MBWM head only computes vocabulary logits at the masked positions. Without that trick, a 65k-way softmax over every token would not fit comfortably in 8 GB of RAM.
-
 
 ## 1. Install (about 5 minutes)
 
@@ -44,9 +42,16 @@ No pcap libraries are needed. `pcap_reader.py` reads `.pcap` and `.pcapng` files
 
 ```bash
 python run_pipeline.py --data datasets          # real datasets, laid out as below
-python run_pipeline.py --data datasets          # or data made by generate_datasets.py (section 3b)
 python run_pipeline.py --data datasets --minutes 30 --per-class 5000 --preset small   # bigger run, better scores
 ```
+
+**Quick smoke test (about 2 minutes).** This runs every stage and produces the full report, but with almost no training time:
+
+```bash
+python run_pipeline.py --data datasets --out results_quick --minutes 0.6 --per-class 200 --max-pairs 5000 --baseline-epochs 15
+```
+
+Startup, extraction, evaluation and plotting take about 1.4 minutes whatever the budget is, so `--minutes` has to stay well below 2. The scores from this run are close to random (IoV-BERT-IDS macro-F1 of roughly 0.01–0.37), so use it only to check that the pipeline works end to end, not for reporting. Writing to `--out results_quick` keeps your main `results/` folder untouched.
 
 Expected layout of the data folder. Any dataset that is missing is skipped, along with its experiment:
 
